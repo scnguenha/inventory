@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:sec="http://www.springframework.org/schema/security" xmlns:zksp="http://www.zkoss.org/2008/zkspring/security"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+                    http://www.springframework.org/schema/beans/spring-beans.xsd
+                    http://www.springframework.org/schema/security 
+                    http://www.springframework.org/schema/security/spring-security.xsd 
+                    http://www.zkoss.org/2008/zkspring/security 
+                    http://www.zkoss.org/2008/zkspring/security/zkspring-security.xsd">
+
+	<sec:global-method-security secured-annotations="enabled" pre-post-annotations="enabled"
+		jsr250-annotations="enabled">
+	</sec:global-method-security>
+
+	<sec:http disable-url-rewriting="false" auto-config="false" use-expressions="true"
+		entry-point-ref="authenticationEntryPoint">
+		<sec:intercept-url pattern="/pages/layout/common.zhtml" access="isAuthenticated()" />
+		<sec:intercept-url pattern="/pages/layout/redirectList.zul" access="isAuthenticated()" />
+		<sec:intercept-url pattern="/**/*.pdf" access="isAuthenticated()" />
+		<sec:intercept-url pattern="/login.zul" access="permitAll" />
+		<sec:intercept-url pattern="/pages/utilizador/recuperarSenhaStep0.zul" access="permitAll" />
+
+		<sec:custom-filter ref="authenticationFilter" position="FORM_LOGIN_FILTER" />
+
+		<sec:logout logout-url="/j_spring_security_logout" logout-success-url="/login.zul"
+			invalidate-session="true" delete-cookies="JSESSIONID" />
+
+		<sec:session-management invalid-session-url="/login.zul"
+			session-fixation-protection="newSession">
+			<sec:concurrency-control max-sessions="1" error-if-maximum-exceeded="true"
+				expired-url="/login.zul" />
+		</sec:session-management>
+
+		<sec:access-denied-handler error-page="/acessoInterdito.zul" />
+
+		<sec:headers disabled="true" />
+		<sec:csrf disabled="true" />
+	</sec:http>
+
+	<sec:authentication-manager />
+
+	<!-- Configuring the httpfirewall to allow semicolon in urls -->
+	<bean id="httpFirewall" class="org.springframework.security.web.firewall.StrictHttpFirewall"
+		p:allowSemicolon="true" />
+
+	<sec:http-firewall ref="httpFirewall" />
+
+	<!-- Custom filter for username and password. The real customization is done in the customAthenticationManager -->
+	<bean id="authenticationFilter"
+		class="org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter"
+		p:authenticationManager-ref="customAuthenticationManager"
+		p:authenticationFailureHandler-ref="customAuthenticationFailureHandler"
+		p:authenticationSuccessHandler-ref="customAuthenticationSuccessHandler" />
+
+	<!-- Custom authentication manager. In order to authenticate, username and password must not be the same -->
+	<bean id="customAuthenticationManager" class="mz.co.scn.inventory.security.CustomAuthenticationManager" />
+
+	<!-- The AuthenticationEntryPoint is responsible for redirecting the user to a particular page, like a login page, whenever 
+		the server sends back a response requiring authentication -->
+	<!-- See Spring-Security Reference 5.4.1 for more info -->
+	<bean id="authenticationEntryPoint"
+		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+		<constructor-arg value="/login.zul" />
+	</bean>
+
+	<!-- We just actually need to set the default failure url here -->
+	<bean id="customAuthenticationFailureHandler" class="mz.co.exi.mp.security.CustomAuthenticationFailureHandler" />
+
+	<!-- We just actually need to set the default target url here -->
+	<bean id="customAuthenticationSuccessHandler" class="mz.co.exi.mp.security.CustomAuthenticationSuccessHandler"
+		p:defaultTargetUrl="/pages/layout/redirect.zul" />
+
+</beans>

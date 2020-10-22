@@ -1,0 +1,1486 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.springframework.org/schema/beans"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:task="http://www.springframework.org/schema/task"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd 
+	http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+	http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd 
+	http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task.xsd">
+
+	<!-- Activates various annotations to be detected in bean classes -->
+	<context:annotation-config />
+
+	<!-- Scans the classpath for annotated components that will be auto-registered as Spring beans. For example @Controller 
+		and @Service. Make sure to set the correct base-package -->
+	<context:component-scan base-package="mz.co.scn.inventory.*" />
+
+	<!-- Enable Support for Transaction Annotation -->
+	<tx:annotation-driven transaction-manager="transactionManager" />
+
+	<!-- Configure a JDBC datasource for Hibernate to connect with -->
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="org.postgresql.Driver" />
+		<property name="url" value="jdbc:postgresql://localhost:5432/inventory" />
+		<property name="username" value="inventory" />
+		<!-- <property name="password" value="4dn4p2k15" /> -->
+		<property name="password" value="inventory" />
+	</bean>
+
+	<bean id="applicationContextProvder" class="mz.co.exi.mp.utils.ApplicationContextProvider" />
+
+	<!-- Configure a Hibernate SessionFactory -->
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="packagesToScan" value="mz.co.exi.mp" />
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</prop>
+				<prop key="hibernate.default_schema">inventory</prop>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<prop key="hibernate.show_sql">true</prop>
+				<!-- <prop key="hibernate.connection.pool_size">1</prop> -->
+				<prop key="hibernate.format_sql">true</prop>
+				<prop key="hibernate.generate_statistics">false</prop>
+				<prop key="hibernate.use_sql_comments">false</prop>
+				<prop key="hibernate.connection.autocommit">false</prop>
+				<prop key="hibernate.use_identifier_rollback">true</prop>
+				<prop key="hibernate.order_updates">true</prop>
+				<prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
+				<prop key="hibernate.query.factory_class">org.hibernate.hql.internal.classic.ClassicQueryTranslatorFactory</prop>
+
+				<!-- Use C3P0 connection in Production mode -->
+				<prop key="hibernate.c3p0.min_size">3</prop>
+				<prop key="hibernate.c3p0.max_size">20</prop>
+				<prop key="hibernate.c3p0.timeout">1800</prop>
+				<prop key="hibernate.c3p0.max_statements">50</prop>
+				<prop key="hibernate.c3p0.acquire_increment">1</prop>
+				<prop key="hibernate.c3p0.idle_test_period">100</prop>
+
+				<!-- Hibernate Envers Configurations 
+				<prop key="org.hibernate.envers.audit_table_prefix"></prop>
+				<prop key="org.hibernate.envers.audit_table_suffix">h</prop>
+				<prop key="org.hibernate.envers.revision_field_name">auditoria_id</prop>
+				<prop key="org.hibernate.envers.revision_type_field_name">operacao</prop>
+				<prop key="org.hibernate.envers.default_schema">inventory</prop>
+-->
+				<!-- Listeners for Hibernate Envers 
+				<prop key="org.hibernate.ejb.event.post-insert">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>
+				<prop key="org.hibernate.ejb.event.post-update">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>
+				<prop key="org.hibernate.ejb.event.post-delete">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>
+				<prop key="org.hibernate.ejb.event.pre-collection-update">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>
+				<prop key="org.hibernate.ejb.event.pre-collection-remove">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>
+				<prop key="org.hibernate.ejb.event.post-collection-recreate">
+					org.hibernate.envers.event.AuditEventListener
+				</prop>-->
+			</props>
+		</property>
+	</bean>
+
+	<!-- Transaction manager for a single Hibernate SessionFactory (alternative to JTA) -->
+	<bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+	<bean id="daoTxTemplate" abstract="true"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+		<property name="transactionManager" ref="transactionManager" />
+		<property name="transactionAttributes">
+			<props>
+				<prop key="create**">PROPAGATION_REQUIRED, -Exception</prop>
+				<prop key="save**">PROPAGATION_REQUIRED, -Exception</prop>
+				<prop key="update**">PROPAGATION_REQUIRED, -Exception</prop>
+				<prop key="delete**">PROPAGATION_REQUIRED, -Exception</prop>
+				<prop key="remove**">PROPAGATION_REQUIRED, -Exception</prop>
+			</props>
+		</property>
+	</bean>
+
+	<!-- Report Utils Bean -->
+	<bean id="reportUtils" class="mz.co.exi.mp.utils.report.ReportUtils">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+	<!-- Mail Service Bean -->
+	<bean id="mailService" class="mz.co.exi.mp.utils.email.MailService" />
+
+	<!-- Java Mail Sender Bean -->
+	<bean class="org.springframework.mail.javamail.JavaMailSenderImpl" id="mailSender">
+		<property name="host" value="smtp.gmail.com" />
+		<property name="port" value="587" />
+		<property name="protocol" value="smtp" />
+		<property name="username" value="logs.application@gmail.com" />
+		<property name="password" value="hgrzwtvzkjiqqodz" />
+		<property name="javaMailProperties">
+			<props>
+				<prop key="mail.from">logs.application@gmail.com</prop>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.starttls.enable">true</prop>
+				<prop key="mail.smtp.quitwait">false</prop>
+				<prop key="mail.smtp.debug">true</prop>
+				<!-- <prop key="mail.smtp.proxy.host">192.168.0.3</prop> -->
+				<!-- <prop key="mail.smtp.proxy.port">3128</prop> -->
+				<!-- <prop key="mail.smtp.proxy.user">simao</prop> -->
+				<!-- <prop key="mail.smtp.proxy.password">*****</prop> -->
+				<!-- <prop key="mail.smtp.connectiontimeout">15000</prop> -->
+				<!-- <prop key="mail.smtp.timeout">15000</prop> -->
+				<!-- <prop key="mail.smtp.writetimeout">15000</prop> -->
+			</props>
+		</property>
+	</bean>
+
+	<!-- Task Executor Bean -->
+	<bean class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor" id="taskExecutor">
+		<property name="corePoolSize" value="5" />
+		<property name="maxPoolSize" value="10" />
+		<property name="queueCapacity" value="500" />
+		<property name="waitForTasksToCompleteOnShutdown" value="true" />
+	</bean>
+
+	<!-- Task Scheduler Bean -->
+	<task:scheduler id="taskScheduler" pool-size="5" />
+
+	<!--Todos os DAO's da aplicacao -->
+	<bean id="acessoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.acesso.AcessoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="grupoUtilizadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.grupo.utilizador.GrupoUtilizadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="linkDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.link.LinkDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="moduloDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.modulo.ModuloDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="paisDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.pais.PaisDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="provinciaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.provincia.ProvinciaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="bairroDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.bairro.BairroDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="municipioDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.municipio.MunicipioDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="distritoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.distrito.DistritoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="postoAdministrativoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.postoadministrativo.PostoAdministrativoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="localidadeDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.localidade.LocalidadeDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="utilizadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.utilizador.UtilizadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="politicaSegurancaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.seguranca.politica.PoliticaSegurancaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="palavraRestritaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.seguranca.palavra.restrita.PalavraRestritaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="passWordDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.seguranca.politica.PassWordDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoCascoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.casco.TipoCascoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="embarcacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.embarcacao.EmbarcacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="corDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.cor.CorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="marcaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.marca.MarcaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoDocumentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.documento.TipoDocumentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="portoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.porto.PortoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="zonaPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.zona.pesca.ZonaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="equipamentoElectronicoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.equipamento.electronico.EquipamentoElectronicoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.RecursoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="especieDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.especie.EspecieDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="codigoActividadeDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.codigo.actividade.CodigoActividadeDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="reparticaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.reparticao.ReparticaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoLicencaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.licenca.pesca.TipoLicencaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="artePescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.arte.pesca.ArtePescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+
+	<bean id="auditoriaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.auditoria.AuditoriaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="empresaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.empresa.EmpresaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="pessoaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.pessoa.PessoaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="documentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.documento.DocumentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoLicencaPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.licenca.pesca.TipoLicencaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoPedidoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.pedido.TipoPedidoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="pedidoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.pedido.PedidoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="parecerDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.parecer.ParecerDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="despachoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.despacho.DespachoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoAlvoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.alvo.RecursoAlvoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="faunaAcompanhanteDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.fauna.acompanhante.FaunaAcompanhanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="armadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.armador.ArmadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="licencaPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.licenca.pesca.LicencaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="pescadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.pescador.PescadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="praticanteDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.praticante.PraticanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="representanteDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.representante.RepresentanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="proprietarioDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.proprietario.ProprietarioDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="quotaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.quota.QuotaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="quotaFaunaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.quota.fauna.QuotaFaunaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="quotaLicenciadaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.quota.licenciada.QuotaLicenciadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="quotaFaunaLicenciadaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.quota.fauna.licenciada.QuotaFaunaLicenciadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="planoPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.plano.pesca.PlanoPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="estadoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.estado.EstadoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="workflowDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tarefa.WorkflowDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoFrotaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.frota.TipoFrotaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="comunicadoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.comunicado.ComunicadoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="sistemaVmsDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.sistema.vms.SistemaVmsDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoDlaVmsDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.dla.vms.TipoDlaVmsDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="modeloDlaVmsDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.modelo.dla.vms.ModeloDlaVmsDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="projectoPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.projecto.pesca.ProjectoPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="projectoEmbarcacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.projecto.embarcacao.ProjectoEmbarcacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tamanhoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tamanho.TamanhoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tacTaeFaunaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tactae.fauna.TacTaeFaunaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tacTaeDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tactae.TacTaeDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoCongelacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.congelacao.TipoCongelacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="armazenagemFrigorificaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.armazenagem.frigorifica.ArmazenagemFrigorificaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="congelacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.congelacao.CongelacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="tipoRefrigeracaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.tipo.refrigeracao.TipoRefrigeracaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="refrigeracaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.refrigeracao.RefrigeracaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="equipamentoProcessamentoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.equipamento.processamento.EquipamentoProcessamentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="concursoPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.concurso.pesca.ConcursoPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="entidadeOrganizadoraDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.entidade.organizadora.EntidadeOrganizadoraDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="equipaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.equipa.EquipaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="embarcacaoAuxiliarDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.embarcacao.auxiliar.EmbarcacaoAuxiliarDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="conviteDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.convite.ConviteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaDecenalDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.decenal.FichaCapturaDecenalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaDecenalDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.decenal.CapturaDecenalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="agenciaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.agencia.AgenciaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="bancoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.banco.BancoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="formaPagamentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.forma.pagamento.FormaPagamentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="taxaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.taxa.TaxaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="areaPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.area.pesca.AreaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="alocacaoQuotaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.alocacao.quota.AlocacaoQuotaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="alocacaoQuotaFaunaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.alocacao.quota.AlocacaoQuotaFaunaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="faunaAcompanhanteCapturadaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.fauna.acompanhante.capturada.FaunaAcompanhanteCapturadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaFaunaAcompanhanteDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.fauna.acompanhante.FichaFaunaAcompanhanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoProibidoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.proibido.RecursoProibidoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaDesportivaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.desportiva.CapturaDesportivaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaDesportivaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.desportiva.FichaCapturaDesportivaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaArtezanalDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.artezanal.CapturaArtezanalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaArtezanalDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.artezanal.FichaCapturaArtezanalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="compraProcessamentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.compra.processamento.CompraProcessamentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="ajusteQuotaCaboMestrePresencaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ajuste.quota.cabomestre.presenca.AjusteQuotaCaboMestrePresencaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="substituicaoEmbarcacaoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.substituicao.embarcacao.SubstituicaoEmbarcacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="responsavelDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.responsavel.ResponsavelDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="taxaFaunaAcompanhanteDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.taxa.fauna.acompanhante.TaxaFaunaAcompanhanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="contabilidadeDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.contabilidade.ContabilidadeDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="custoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.custo.CustoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="prestacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.prestacao.PrestacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="propulsaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.propulsao.PropulsaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="reciboDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recibo.ReciboDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoCompraDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.compra.processamento.RecursoCompraDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoTipoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.tipo.RecursoTipoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="relatorioDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.RelatorioDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="relatorioReparticaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.reparticao.RelatorioReparticaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaEspecieAlvoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.especie.alvo.CapturaEspecieAlvoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaFaunaAcompanhanteDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.fauna.acompanhante.CapturaFaunaAcompanhanteDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaEsforcoPescaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.esforco.pesca.FichaCapturaEsforcoPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="lancamentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.lancamento.LancamentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaViagemArtePescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.viagem.arte.pesca.FichaViagemArtePescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemArtePescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.arte.pesca.ViagemArtePescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemCapturaArtezanalDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.captura.artezanal.ViagemCapturaArtezanalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemCapturaBordoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.captura.bordo.ViagemCapturaBordoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemEspecieCapturadaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.especie.capturada.ViagemEspecieCapturadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemFaunaCapturadaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.fauna.capturada.ViagemFaunaCapturadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="viagemTransbordoDescargaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.viagem.transbordo.descarga.ViagemTransbordoDescargaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="relatorioInspenccaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.RelatorioInspenccaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoAlvoCapturadaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.alvocapturada.InspenccaoAlvoCapturadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoAlvoDescargaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.alvodescarga.InspenccaoAlvoDescargaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoArtePescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.artepesca.InspenccaoArtePescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoDescargaTransbordoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.descargatransbordo.InspenccaoDescargaTransbordoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoDocumentoBordoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.documentobordo.InspenccaoDocumentoBordoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoFaunaCapturadaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.faunacapturada.InspenccaoFaunaCapturadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoFaunaDescargaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.faunadescarga.InspenccaoFaunaDescargaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="malhaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.malha.MalhaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoProdutoBordoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.produto.bordo.InspenccaoProdutoBordoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="inspenccaoViagemDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.relatorio.inspenccao.viagem.InspenccaoViagemDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="entradaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.entrada.EntradaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="saidaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.saida.SaidaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="especieEntradaSaidaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.entradasaida.especieentradasaida.EspecieEntradaSaidaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="agenteFiscalizacaoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.agente.fiscalizacao.AgenteFiscalizacaoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="especieTresDiasDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.especie.tresdias.EspecieTresDiasDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaTresDiasDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.tresdias.FichaCapturaTresDiasDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="embarcacaoEnvolvidaTransbordoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean
+				class="mz.co.exi.mp.model.relatorio.inspenccao.descargatransbordo.embarcacaoenvolvida.EmbarcacaoEnvolvidaTransbordoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="fichaCapturaAcidentalDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.ficha.captura.acidental.FichaCapturaAcidentalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="capturaAcidentalDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.captura.acidental.CapturaAcidentalDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoAlvoTamanhoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.alvo.tamanho.RecursoAlvoTamanhoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="recursoAlvoZonaPescaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.recurso.alvo.zona.pesca.RecursoAlvoZonaPescaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="aquisicaoCapturaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.aquisicao.captura.AquisicaoCapturaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="certificadoCapturaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.certificado.captura.CertificadoCapturaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="especieExportarDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.expecie.exportar.EspecieExportarDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="exportadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.exportador.ExportadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="importadorDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.importador.ImportadorDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="cancelamentoDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.cancelamento.CancelamentoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="notificationDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.notification.NotificationDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="faunaAcompanhanteLicenciadaDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.fauna.acompanhante.licenciada.FaunaAcompanhanteLicenciadaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="templateFichaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.template.ficha.TemplateFichaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="templateFichaRecursoAlvoDAO"
+		class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean" parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.template.ficha.recurso.alvo.TemplateFichaRecursoAlvoDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="templateCapturaDAO" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+		parent="daoTxTemplate">
+		<property name="target">
+			<bean class="mz.co.exi.mp.model.template.captura.TemplateCapturaDAOImpl">
+				<property name="sessionFactory" ref="sessionFactory" />
+			</bean>
+		</property>
+	</bean>
+</beans>

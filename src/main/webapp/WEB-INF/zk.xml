@@ -1,12 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!--
-	Created by ZK Studio
--->
+<!-- Created by ZK Studio -->
 
 <zk>
+
+	<!-- Defines the application's name -->
+	<preference>
+		<name>org.zkoss.zk.ui.WebApp.name</name>
+		<value>Sistema para a Monitorização da Actividade Pesqueira</value>
+	</preference>
+
 	<device-config>
 		<device-type>ajax</device-type>
-		<timeout-uri>/timeout.zul</timeout-uri><!-- An empty URL can cause the browser to reload the same URL -->
+		<timeout-uri>/login.zul</timeout-uri><!-- An empty URL can cause the browser to reload the same URL -->
 	</device-config>
+	
+	<desktop-config>
+		<!-- Used on this project [BOOTSTRAP] -->
+		<theme-uri>/webjars/bootstrap/4.5.0/css/bootstrap.min.css</theme-uri>
+
+		<!-- Used on this project [FONTAWESOME ICONS] -->
+		<theme-uri>/webjars/font-awesome/5.13.1/css/fontawesome.min.css</theme-uri>
+
+		<theme-uri>/webjars/font-awesome/5.13.1/css/all.min.css</theme-uri>
+
+		<theme-uri>/webjars/font-awesome/5.13.1/css/brands.min.css</theme-uri>
+
+		<theme-uri>/webjars/font-awesome/5.13.1/css/regular.min.css</theme-uri>
+
+		<theme-uri>/webjars/font-awesome/5.13.1/css/solid.min.css</theme-uri>
+	</desktop-config>
 </zk>
